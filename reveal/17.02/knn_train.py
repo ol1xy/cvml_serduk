@@ -43,7 +43,7 @@ def make_train(path):
 
 
 
-data = Path("C:/Users/ol1xy/2_course/2/comp_ml_vision/17.02/knn-example/out/train")
+data = Path("C:/Users/ol1xy/2_course/2/cvml_serduk/17.02/knn-example/out/train")
 
 image = imread(data / "../image.png")
 
