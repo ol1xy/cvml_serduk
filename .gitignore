@@ -1,6 +1,12 @@
 reated by https://www.toptal.com/developers/gitignore/api/python,opencv
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,opencv
 
+### Images ###
+*.png
+*.jpg
+*.zip
+train/
+
 ### OpenCV ###
 #OpenCV for Mac and Linux
 #build and release folders
