@@ -1,37 +1,54 @@
-import cv2 
+import cv2
 import numpy as np
-import matplotlib.pyplot as plt
+from pathlib import Path
+from skimage.measure import regionprops, label
+from skimage.io import imread
 
-n = 1000
+base_path = Path(__file__).resolve().parent
+data = np.load(base_path / "knn_data.npz")
+knn = cv2.ml.KNearest_create()
+knn.train(data['train'], cv2.ml.ROW_SAMPLE, data['responses'])
+char_map = data['char_map']
 
-x1 = 100 + np.random.randint(-25, 25, n)
-y1 = 100 + np.random.randint(-25, 25, n)
-r1 = np.repeat(1, n)
+def extractor(image_roi):
+    lb = label(image_roi)
+    props = regionprops(lb)
+    if not props: return None
+    prop = max(props, key=lambda x: x.area)
+    return [prop.eccentricity, prop.solidity, prop.extent, prop.orientation,
+            prop.minor_axis_length / prop.major_axis_length if prop.major_axis_length > 0 else 0,
+            prop.perimeter / prop.area if prop.area > 0 else 0]
 
-x2 = 125 + np.random.randint(-25, 25, n)
-y2 = 125 + np.random.randint(-25, 25, n)
-r2 = np.repeat(2, n)
+def process_images():
+    task_path = base_path / "task"
+    images = sorted([p for p in task_path.glob("*.png") if "train" not in p.parts])
 
-new_point = (127, 124)
+    for img_p in images:
+        image = imread(img_p)
+        gray = np.mean(image, 2).astype("u1") if image.ndim == 3 else image
+        
+        binary = (gray > 0).astype("u1")
+        
+        binary = cv2.dilate(binary, np.ones((3, 3), np.uint8))
+        
+        lb = label(binary)
+        props = sorted(regionprops(lb), key=lambda x: x.bbox[1])
+        
+        text, last_x_end = "", -1
 
-knn = cv2.ml.KNearest.create()
-train = np.stack([np.hstack([x1, x2]),
-                 np.hstack([y1, y2])]).T.astype("f4")
+        for prop in props:
 
-responses = np.hstack([r1, r2]).reshape(-1, 1).astype("f4")
-knn.train(train, cv2.ml.ROW_SAMPLE, responses)
-print(train.shape, responses.shape)
+            if prop.area < 25: continue
+            if last_x_end != -1 and (prop.bbox[1] - last_x_end) > 20:
+                text += " "
 
-ret, results, neighbours, dist = knn.findNearest(
-    np.array(new_point).astype("f4").reshape(1, 2), 5   
-)
+            feat = extractor(prop.image)
+            if feat is not None:
+                _, res, _, _ = knn.findNearest(np.array([feat], "f4"), 3)
+                text += char_map[int(res[0][0])]
+            
+            last_x_end = prop.bbox[3]
 
-print(ret, results, neighbours, dist)
+        print(f"{img_p.name}: {text}")
 
-plt.scatter(x1, y1, 80, "r", "^")
-plt.scatter(x2, y2, 80, "b", "s")
-marker = "^"
-if ret == 2:
-    marker = "s"
-plt.scatter(new_point[0], new_point[1], 80, "g", marker)
-plt.show()
+process_images()
