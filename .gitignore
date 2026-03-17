@@ -12,12 +12,15 @@ reated by https://www.toptal.com/developers/gitignore/api/python,opencv
 *.wpd
 *.wps
 
+###Models###
+*.pth
 
 ### Images ###
 *.png
 *.jpg
 *.zip
 train/
+FashionMNIST/
 
 ### OpenCV ###
 #OpenCV for Mac and Linux
