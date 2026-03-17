@@ -21,6 +21,7 @@ reated by https://www.toptal.com/developers/gitignore/api/python,opencv
 *.zip
 train/
 FashionMNIST/
+deep_learning/LeNet/data/MNIST/
 
 ### OpenCV ###
 #OpenCV for Mac and Linux
