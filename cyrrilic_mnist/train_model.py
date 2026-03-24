@@ -28,7 +28,7 @@ class CyrrilicDataset(Dataset):
                     self.labels.append(self.class_to_idx[cls_name])
 
     def __len__(self):
-        pass
+        return len(self.image_paths)
 
     def __getitem__(self, idx):
         img_path = self.image_paths[idx]
@@ -37,10 +37,12 @@ class CyrrilicDataset(Dataset):
         image = Image.open(img_path).convert("L")
 
         if self.transform:
-            image = ""
-
+            image = self.transform(image)
         return image, label
     
-train_transforms = transforms.Compose([
-    transforms.Resize((28, 28))
+augments = transforms.Compose([
+    transforms.Resize((28, 28)),
+    transforms.RandomAffine(5, (0.1, 0.1), (0.5, 1), 10),
+    transforms.RandomRotation(15),
+    transforms.ToTensor()
 ])
