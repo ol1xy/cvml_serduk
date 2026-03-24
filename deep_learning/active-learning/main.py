@@ -13,9 +13,9 @@ from pathlib import Path
 device = torch_directml.device()
 save_path = Path(__file__).parent
 model_path = save_path / "model.pth"
-#TODO EFICCIENT_NET B 0 in HOMEWORK, size in entry parameters
 
 def build_model():
+    #TODO EFICCIENT_NET_B0 in HOMEWORK, size in entry parameters
     weights = torchvision.models.AlexNet_Weights.IMAGENET1K_V1
     model = torchvision.models.alexnet(weights=weights)
 
@@ -96,6 +96,7 @@ cv2.namedWindow("Camera", cv2.WINDOW_GUI_NORMAL)
 buffer = Buffer()
 count_labeled = 0
 
+# TODO graphics for efficient
 while True:
     _, frame = cap.read()
     cv2.imshow("Camera", frame)
