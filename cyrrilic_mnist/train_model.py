@@ -71,3 +71,40 @@ class CyrillicCNN(nn.Module):
 
         return x
 
+if __name__ == "__main__":
+    dataset = CyrrilicDataset(root_dir = "cyrillic/Cyrillic",
+                              transform=augments)
+    dataloader = DataLoader(dataset, batch_size = 32,
+                            shuffle = True)
+    num_classes = len(dataset.classes)
+    model = CyrillicCNN(num_classes)
+
+    loss_fn = nn.CrossEntropyLoss(model)
+    
+    optimizier = torch.optim.Adam(
+        model.parameters(),
+        lr = 0.001
+        )
+    
+    loss_history = []
+
+    epochs = 15
+    for epoch in range(epochs):
+        total_loss = 0.0
+
+        for images, labels in dataloader:
+            optimizier.zero_grad()
+            outputs = model(images)
+            loss = loss_fn(outputs, labels)
+            loss.backward()
+            loss.backward()
+            optimizier.step()
+
+            total_loss += loss.item()
+
+        avg_loss = total_loss / len(dataloader)
+        loss_history.append(avg_loss)
+        print(f"Epoch: {epoch+1}, loss: {avg_loss:.4f}")
+
+    print("end")
+    
