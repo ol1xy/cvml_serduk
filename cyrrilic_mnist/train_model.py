@@ -39,13 +39,14 @@ class CyrrilicDataset(Dataset):
         stream = open(img_path, "rb")
         bytes = bytearray(stream.read())
         numpyarray = np.asarray(bytes, dtype=np.uint8)
-        image_cv = cv2.imdecode(numpyarray, cv2.IMREAD_GRAYSCALE)
+        image_rgba = cv2.imdecode(numpyarray, cv2.IMREAD_UNCHANGED)
         stream.close()
         
-        image_cv = cv2.bitwise_not(image_cv)
+        image_gray = image_rgba[:, :, 3]
+        kernel = np.ones((3, 3), np.uint8)
+        image_dilated = cv2.dilate(image_gray, kernel, iterations=1)
 
-        _, image_cv = cv2.threshold(image_cv, 128, 255, cv2.THRESH_BINARY)
-        image = Image.fromarray(image_cv)
+        image = Image.fromarray(image_dilated)
 
         if self.transform:
             image = self.transform(image)
@@ -53,8 +54,7 @@ class CyrrilicDataset(Dataset):
     
 augments = transforms.Compose([
     transforms.Resize((28, 28)),
-    # transforms.RandomAffine(5, (0.1, 0.1), (0.5, 1), 10),
-    transforms.RandomRotation(10),
+    transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)),
     transforms.ToTensor()
 ])
 
