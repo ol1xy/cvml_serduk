@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
+import cv2  
+import numpy as np
 
 class CyrrilicDataset(Dataset):
     def __init__(self, root_dir, transform=None):
@@ -34,7 +36,16 @@ class CyrrilicDataset(Dataset):
         img_path = self.image_paths[idx]
         label = self.labels[idx]
 
-        image = Image.open(img_path).convert("L")
+        stream = open(img_path, "rb")
+        bytes = bytearray(stream.read())
+        numpyarray = np.asarray(bytes, dtype=np.uint8)
+        image_cv = cv2.imdecode(numpyarray, cv2.IMREAD_GRAYSCALE)
+        stream.close()
+        
+        image_cv = cv2.bitwise_not(image_cv)
+
+        _, image_cv = cv2.threshold(image_cv, 128, 255, cv2.THRESH_BINARY)
+        image = Image.fromarray(image_cv)
 
         if self.transform:
             image = self.transform(image)
