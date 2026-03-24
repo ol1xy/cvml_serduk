@@ -8,18 +8,26 @@ from PIL import Image
 import time
 from collections import deque
 import torch_directml
+from pathlib import Path
 
 device = torch_directml.device()
+save_path = Path(__file__).parent
+model_path = save_path / "model.pth"
 #TODO EFICCIENT_NET B 0 in HOMEWORK, size in entry parameters
 
 def build_model():
     weights = torchvision.models.AlexNet_Weights.IMAGENET1K_V1
     model = torchvision.models.alexnet(weights=weights)
-    for param in model.features.parameters():
-        param.requires_grad = False
+
 
     features = model.classifier[6].in_features
     model.classifier[6] = nn.Linear(features, 1)
+    if model_path.exists():
+        model.load_state_dict(torch.load(model_path))
+#TODO WHY NO PARAMETERS??
+    for param in model.features.parameters():
+        param.requires_grad = False
+
     return model.to(device=device)
 
 model = build_model()
@@ -86,6 +94,7 @@ class Buffer():
 cap = cv2.VideoCapture(0)
 cv2.namedWindow("Camera", cv2.WINDOW_GUI_NORMAL)
 buffer = Buffer()
+count_labeled = 0
 
 while True:
     _, frame = cap.read()
@@ -99,11 +108,13 @@ while True:
     elif  key == ord("1"): #person
         tensor = transform(image)
         buffer.append(tensor, 1.0)
+        count_labeled += 1
 
 
     elif key == ord("2"): #no person
         tensor = transform(image)
         buffer.append(tensor, 0.0)
+        count_labeled += 1
 
     elif key == ord("p"): #predict
         t = time.perf_counter()
@@ -112,10 +123,11 @@ while True:
         print(label, confidence)
 
     elif key == ord("s"): #save_model
-        pass
+        torch.save(model.state_dict(), model_path)
 
-    print(len(buffer))
-    if len(buffer) >= 16:
+    print(len(buffer), count_labeled)
+    if count_labeled >= buffer.frames.maxlen:
         loss = train(buffer)
         if loss:
             print(f"Loss = {loss}")
+        count_labeled = 0
