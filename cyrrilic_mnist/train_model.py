@@ -42,7 +42,7 @@ class CyrrilicDataset(Dataset):
     
 augments = transforms.Compose([
     transforms.Resize((28, 28)),
-    transforms.RandomAffine(5, (0.1, 0.1), (0.5, 1), 10),
+    # transforms.RandomAffine(5, (0.1, 0.1), (0.5, 1), 10),
     transforms.RandomRotation(15),
     transforms.ToTensor()
 ])
@@ -79,9 +79,9 @@ if __name__ == "__main__":
     num_classes = len(dataset.classes)
     model = CyrillicCNN(num_classes)
 
-    loss_fn = nn.CrossEntropyLoss(model)
+    loss_fn = nn.CrossEntropyLoss()
     
-    optimizier = torch.optim.Adam(
+    optimizer = torch.optim.Adam(
         model.parameters(),
         lr = 0.001
         )
@@ -93,12 +93,11 @@ if __name__ == "__main__":
         total_loss = 0.0
 
         for images, labels in dataloader:
-            optimizier.zero_grad()
+            optimizer.zero_grad()
             outputs = model(images)
             loss = loss_fn(outputs, labels)
             loss.backward()
-            loss.backward()
-            optimizier.step()
+            optimizer.step()
 
             total_loss += loss.item()
 
@@ -107,4 +106,10 @@ if __name__ == "__main__":
         print(f"Epoch: {epoch+1}, loss: {avg_loss:.4f}")
 
     print("end")
-    
+
+    torch.save(model.state_dict(), "cyrillic_model.pth")
+
+    plt.plot(loss_history, label="training loss")
+    plt.xlabel("epochs")
+    plt.ylabel("loss")
+    plt.savefig("train.png")
