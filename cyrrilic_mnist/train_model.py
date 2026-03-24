@@ -43,7 +43,7 @@ class CyrrilicDataset(Dataset):
 augments = transforms.Compose([
     transforms.Resize((28, 28)),
     # transforms.RandomAffine(5, (0.1, 0.1), (0.5, 1), 10),
-    transforms.RandomRotation(15),
+    transforms.RandomRotation(10),
     transforms.ToTensor()
 ])
 
