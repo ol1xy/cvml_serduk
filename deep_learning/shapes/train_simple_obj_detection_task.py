@@ -52,23 +52,36 @@ class SimpleDetector(nn.Module):
     def __init__(self, num_classes=3):
         super().__init__()
         self.backbone = nn.Sequential(
-            nn.Conv2d(3, 6, 5),
-            nn.AvgPool2d(2, 2),
+            nn.Conv2d(3, 32, 3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
 
-            nn.Conv2d(6, 16, 5),
-            nn.AvgPool2d(2, 2),
+            nn.Conv2d(32, 64, 3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
 
-            nn.Conv2d(16, 120, 5),
+            nn.Conv2d(64, 128, 3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
 
-            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(128, 256, 3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            nn.AdaptiveAvgPool2d(2),
         )
         self.fc = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(120, 84),
+            nn.Linear(1024, 256),
             nn.ReLU(),
+            nn.Dropout(0.3)
         )
-        self.cls_head = nn.Linear(84, num_classes)
-        self.bbox_head = nn.Linear(84, 4)
+        self.cls_head = nn.Linear(256, num_classes)
+        self.bbox_head = nn.Linear(256, 4)
 
     def forward(self, x):
         features = self.backbone(x)
