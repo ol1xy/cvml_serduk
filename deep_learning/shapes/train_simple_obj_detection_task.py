@@ -76,12 +76,12 @@ class SimpleDetector(nn.Module):
         )
         self.fc = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(1024, 256),
+            nn.Linear(1024, 128), #TODO не менять
             nn.ReLU(),
             nn.Dropout(0.3)
         )
-        self.cls_head = nn.Linear(256, num_classes)
-        self.bbox_head = nn.Linear(256, 4)
+        self.cls_head = nn.Linear(128, num_classes)
+        self.bbox_head = nn.Linear(128, 4) #TODO Вынести размер, посчитанный из высоты и ширины в отдельный параметр (плохо обучается на статике)
 
     def forward(self, x):
         features = self.backbone(x)
@@ -293,3 +293,6 @@ def show_predictions(loader, model, n=8):
 
 
 show_predictions(val_loader, model)
+
+
+#TODO сделать вывод о том, на каких данных лучше работает модель (связь фигуры и цвета)
