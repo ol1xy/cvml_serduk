@@ -12,6 +12,9 @@ reated by https://www.toptal.com/developers/gitignore/api/python,opencv
 *.wpd
 *.wps
 
+dataset/
+figure-dataset/
+
 ###Models###
 *.pth
 
