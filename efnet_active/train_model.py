@@ -21,8 +21,8 @@ def build_model():
 
     print(model.classifier)
 
-    features = model.classifier[6].in_features
-    model.classifier[6] = nn.Linear(features, 1)
+    features = model.classifier[-1].in_features
+    model.classifier[-1] = nn.Linear(features, 1)
     if model_path.exists():
         model.load_state_dict(torch.load(model_path))
 #TODO WHY NO PARAMETERS??
