@@ -17,6 +17,7 @@ figure-dataset/
 
 ###Models###
 *.pth
+*.pt
 
 ### Images ###
 *.png
