@@ -28,6 +28,9 @@ FashionMNIST/
 deep_learning/LeNet/data/MNIST/
 images
 
+### Stuff
+*.pdf
+
 ### OpenCV ###
 #OpenCV for Mac and Linux
 #build and release folders
