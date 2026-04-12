@@ -26,6 +26,7 @@ figure-dataset/
 train/
 FashionMNIST/
 deep_learning/LeNet/data/MNIST/
+images
 
 ### OpenCV ###
 #OpenCV for Mac and Linux
