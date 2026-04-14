@@ -28,6 +28,10 @@ FashionMNIST/
 deep_learning/LeNet/data/MNIST/
 images
 
+
+### Sounds
+*.mp3
+
 ### Stuff
 *.pdf
 
