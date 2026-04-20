@@ -52,41 +52,37 @@ class SimpleDetector(nn.Module):
     def __init__(self, num_classes=3):
         super().__init__()
         self.backbone = nn.Sequential(
-            nn.Conv2d(3, 32, 3, padding=1),
-            nn.BatchNorm2d(32),
+            nn.Conv2d(3, 16, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(16, 32, 3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(2),
 
             nn.Conv2d(32, 64, 3, padding=1),
-            nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.MaxPool2d(2),
-
-            nn.Conv2d(64, 128, 3, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-
-            nn.Conv2d(128, 256, 3, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-
-            nn.AdaptiveAvgPool2d(2),
+            nn.AdaptiveAvgPool2d(4)
         )
+
         self.fc = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(1024, 128), #TODO не менять
+            nn.Linear(1024, 128),
             nn.ReLU(),
-            nn.Dropout(0.3)
+            nn.Dropout(0.1)
         )
+
         self.cls_head = nn.Linear(128, num_classes)
-        self.bbox_head = nn.Linear(128, 4) #TODO Вынести размер, посчитанный из высоты и ширины в отдельный параметр (плохо обучается на статике)
+        self.bbox_head = nn.Linear(128, 4) 
 
     def forward(self, x):
         features = self.backbone(x)
         features = self.fc(features)
-        return self.cls_head(features), torch.sigmoid(self.bbox_head(features))
+
+        logits = self.cls_head(features)
+        coords = torch.sigmoid(self.bbox_head(features))
+
+        return logits, coords
 
 
 def giou_loss(pred, target):
@@ -124,7 +120,7 @@ def giou_loss(pred, target):
     return (1 - giou).mean()
 
 
-def detection_loss(cls_pred, bbox_pred, cls_targets, bbox_targets, lambda_bbox=10.0):
+def detection_loss(cls_pred, bbox_pred, cls_targets, bbox_targets, lambda_bbox=5.0):
     loss_cls = F.cross_entropy(cls_pred, cls_targets)
     loss_bbox = F.smooth_l1_loss(bbox_pred, bbox_targets)
     loss_bbox += giou_loss(bbox_pred, bbox_targets)
@@ -133,7 +129,13 @@ def detection_loss(cls_pred, bbox_pred, cls_targets, bbox_targets, lambda_bbox=1
 
 transform = transforms.Compose(
     [
-        transforms.ToTensor(),
+        transforms.Resize((240, 240)),
+        transforms.ColorJitter(brightness=0.3,
+                           contrast=0.3,
+                           saturation=0.2),
+        transforms.ToTensor(), 
+        transforms.Normalize([0.485, 0.456, 0.406],
+                         [0.229, 0.224, 0.225],)
     ]
 )
 
@@ -148,7 +150,7 @@ model = SimpleDetector(num_classes=len(classes)).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
 
-epochs = 30
+epochs = 10
 save_path = root / "best.pt"
 accuracy_threshold = 0.95
 no_improve_count = 10
@@ -193,7 +195,6 @@ else:
                     bbox_t.to(device),
                 )
                 cls_pred, bbox_pred = model(images)
-                print(bbox_pred[0], bbox_t[0])
                 loss, _, _ = detection_loss(cls_pred, bbox_pred, cls_t, bbox_t)
                 val_loss += loss.item()
                 correct += (cls_pred.argmax(1) == cls_t).sum().item()
