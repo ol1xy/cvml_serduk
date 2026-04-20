@@ -52,24 +52,32 @@ class SimpleDetector(nn.Module):
     def __init__(self, num_classes=3):
         super().__init__()
         self.backbone = nn.Sequential(
-            nn.Conv2d(3, 16, 3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-
-            nn.Conv2d(16, 32, 3, padding=1),
+            nn.Conv2d(3, 32, 3, padding=1),
+            nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.MaxPool2d(2),
 
             nn.Conv2d(32, 64, 3, padding=1),
+            nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.AdaptiveAvgPool2d(4)
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(64, 128, 3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(128, 256, 3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d(2)
         )
 
         self.fc = nn.Sequential(
             nn.Flatten(),
             nn.Linear(1024, 128),
             nn.ReLU(),
-            nn.Dropout(0.1)
+            nn.Dropout(0.2)
         )
 
         self.cls_head = nn.Linear(128, num_classes)
@@ -120,7 +128,7 @@ def giou_loss(pred, target):
     return (1 - giou).mean()
 
 
-def detection_loss(cls_pred, bbox_pred, cls_targets, bbox_targets, lambda_bbox=5.0):
+def detection_loss(cls_pred, bbox_pred, cls_targets, bbox_targets, lambda_bbox=4.0):
     loss_cls = F.cross_entropy(cls_pred, cls_targets)
     loss_bbox = F.smooth_l1_loss(bbox_pred, bbox_targets)
     loss_bbox += giou_loss(bbox_pred, bbox_targets)
@@ -129,7 +137,7 @@ def detection_loss(cls_pred, bbox_pred, cls_targets, bbox_targets, lambda_bbox=5
 
 transform = transforms.Compose(
     [
-        transforms.Resize((240, 240)),
+        transforms.Resize((128, 128)),
         transforms.ColorJitter(brightness=0.3,
                            contrast=0.3,
                            saturation=0.2),
@@ -146,11 +154,12 @@ val_ds = ShapesDataset(root / "val", transform=transform)
 train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, num_workers=0)
 val_loader = DataLoader(val_ds, batch_size=32, shuffle=False, num_workers=0)
 
+epochs = 15
 model = SimpleDetector(num_classes=len(classes)).to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
-epochs = 10
+
 save_path = root / "best.pt"
 accuracy_threshold = 0.95
 no_improve_count = 10
@@ -175,6 +184,7 @@ else:
             cls_pred, bbox_pred = model(images)
             loss, lc, lb = detection_loss(cls_pred, bbox_pred, cls_t, bbox_t)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0) 
             optimizer.step()
             train_loss += loss.item()
             train_cls += lc.item()
