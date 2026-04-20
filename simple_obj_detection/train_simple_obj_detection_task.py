@@ -81,16 +81,17 @@ class SimpleDetector(nn.Module):
         )
 
         self.cls_head = nn.Linear(128, num_classes)
-        self.bbox_head = nn.Linear(128, 4) 
+        self.center_head = nn.Linear(128, 2) 
+        self.size_head = nn.Linear(128, 2)  
 
     def forward(self, x):
         features = self.backbone(x)
         features = self.fc(features)
-
         logits = self.cls_head(features)
-        coords = torch.sigmoid(self.bbox_head(features))
+        center = torch.sigmoid(self.center_head(features))
+        size = torch.sigmoid(self.size_head(features)) * 0.9 + 0.05 
 
-        return logits, coords
+        return logits, torch.cat([center, size], dim=1)
 
 
 def giou_loss(pred, target):
@@ -128,11 +129,13 @@ def giou_loss(pred, target):
     return (1 - giou).mean()
 
 
-def detection_loss(cls_pred, bbox_pred, cls_targets, bbox_targets, lambda_bbox=4.0):
+def detection_loss(cls_pred, bbox_pred, cls_targets, bbox_targets, lambda_bbox=100.0):
     loss_cls = F.cross_entropy(cls_pred, cls_targets)
-    loss_bbox = F.smooth_l1_loss(bbox_pred, bbox_targets)
-    loss_bbox += giou_loss(bbox_pred, bbox_targets)
-    return loss_cls + lambda_bbox * loss_bbox, loss_cls, loss_bbox
+    loss_center = F.mse_loss(bbox_pred[:, :2], bbox_targets[:, :2]) * 2.0
+    loss_size = giou_loss(bbox_pred, bbox_targets)
+
+
+    return loss_cls + lambda_bbox * (loss_center + loss_size), loss_cls, loss_center + loss_size
 
 
 transform = transforms.Compose(
