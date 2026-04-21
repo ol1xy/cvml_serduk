@@ -70,26 +70,39 @@ class SimpleDetector(nn.Module):
             nn.Conv2d(128, 256, 3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(),
-            nn.AdaptiveAvgPool2d(2)
+            nn.AdaptiveAvgPool2d(4)
         )
 
         self.fc = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(1024, 128),
+            nn.Linear(4096, 256),
             nn.ReLU(),
-            nn.Dropout(0.2)
+            nn.BatchNorm1d(256)
         )
 
-        self.cls_head = nn.Linear(128, num_classes)
-        self.center_head = nn.Linear(128, 2) 
-        self.size_head = nn.Linear(128, 2)  
+        self.cls_head = nn.Sequential(
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(128, num_classes)
+        )
+
+        self.reg_head = nn.Sequential(
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 4)
+        )
 
     def forward(self, x):
         features = self.backbone(x)
         features = self.fc(features)
         logits = self.cls_head(features)
-        center = torch.sigmoid(self.center_head(features))
-        size = torch.sigmoid(self.size_head(features)) * 0.9 + 0.05 
+
+        reg_output = self.reg_head(features)
+
+
+        center = torch.sigmoid(reg_output[:, :2])
+        size = torch.sigmoid(reg_output[:, 2:]) * 0.9 + 0.05 
 
         return logits, torch.cat([center, size], dim=1)
 
@@ -105,7 +118,7 @@ def giou_loss(pred, target):
     t_x2 = target[:, 0] + target[:, 2] / 2
     t_y2 = target[:, 1] + target[:, 3] / 2
 
-    inter_x1 = torch.max(p_x1, t_x1)
+    inter_x1 = torch.max(p_x1, t_x1)    
     inter_y1 = torch.max(p_y1, t_y1)
     inter_x2 = torch.min(p_x2, t_x2)
     inter_y2 = torch.min(p_y2, t_y2)
@@ -128,11 +141,12 @@ def giou_loss(pred, target):
     giou = iou - (area_c - union) / (area_c + 1e-7)
     return (1 - giou).mean()
 
+current_lambda = 10
 
-def detection_loss(cls_pred, bbox_pred, cls_targets, bbox_targets, lambda_bbox=100.0):
+def detection_loss(cls_pred, bbox_pred, cls_targets, bbox_targets, lambda_bbox=current_lambda):
     loss_cls = F.cross_entropy(cls_pred, cls_targets)
     loss_center = F.mse_loss(bbox_pred[:, :2], bbox_targets[:, :2]) * 2.0
-    loss_size = giou_loss(bbox_pred, bbox_targets)
+    loss_size = F.mse_loss(bbox_pred[:, 2:], bbox_targets[:, 2:]) * 5.0
 
 
     return loss_cls + lambda_bbox * (loss_center + loss_size), loss_cls, loss_center + loss_size
@@ -141,12 +155,12 @@ def detection_loss(cls_pred, bbox_pred, cls_targets, bbox_targets, lambda_bbox=1
 transform = transforms.Compose(
     [
         transforms.Resize((128, 128)),
-        transforms.ColorJitter(brightness=0.3,
-                           contrast=0.3,
-                           saturation=0.2),
+        transforms.ColorJitter(brightness=0.2,
+                           contrast=0.2,
+                           saturation=0.1),
         transforms.ToTensor(), 
-        transforms.Normalize([0.485, 0.456, 0.406],
-                         [0.229, 0.224, 0.225],)
+        # transforms.Normalize([0.485, 0.456, 0.406],
+        #                  [0.229, 0.224, 0.225],)
     ]
 )
 
@@ -157,11 +171,10 @@ val_ds = ShapesDataset(root / "val", transform=transform)
 train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, num_workers=0)
 val_loader = DataLoader(val_ds, batch_size=32, shuffle=False, num_workers=0)
 
-epochs = 15
+epochs = 40
 model = SimpleDetector(num_classes=len(classes)).to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-3)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
-
 
 save_path = root / "best.pt"
 accuracy_threshold = 0.95
@@ -170,6 +183,9 @@ no_improve_count = 10
 history = defaultdict(list)
 best_acc = 0.0
 no_improve = 0
+backbone_frozen = False
+
+best_loss = float('inf')
 
 if save_path.exists():
     model.load_state_dict(torch.load(save_path))
@@ -208,25 +224,35 @@ else:
                     bbox_t.to(device),
                 )
                 cls_pred, bbox_pred = model(images)
-                loss, _, _ = detection_loss(cls_pred, bbox_pred, cls_t, bbox_t)
+                loss, _, _ = detection_loss(cls_pred, bbox_pred, cls_t, bbox_t, current_lambda)
                 val_loss += loss.item()
                 correct += (cls_pred.argmax(1) == cls_t).sum().item()
                 total += cls_t.size(0)
 
         val_acc = correct / total
+        current_lambda = 10.0 + (val_acc * 30.0)
         history["val_loss"].append(val_loss / len(val_loader))
         history["val_acc"].append(val_acc)
 
         scheduler.step()
 
-        if val_acc > best_acc:
+        if val_acc >= 0.98 and not backbone_frozen:
+            for param in model.backbone.parameters():
+                param.requires_grad = False
+            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=5e-5)
+            backbone_frozen = True
+
+        avg_val_loss = val_loss / len(val_loader)
+
+        if (val_acc > best_acc) or (val_acc == best_acc and avg_val_loss < best_loss):
             best_acc = val_acc
+            best_loss = avg_val_loss
             no_improve = 0
             torch.save(model.state_dict(), save_path)
         else:
             no_improve += 1
 
-        if epoch % 5 == 0 or epoch == 1 or val_acc > best_acc - 0.01:
+        if epoch % 5 == 0 or epoch == 1:
             print(
                 f"Epoch {epoch:3d}/{epochs}  "
                 f"train={history['train_loss'][-1]:.4f}  "
@@ -234,7 +260,8 @@ else:
                 f"acc={val_acc:.3f}"
             )
 
-        if val_acc >= accuracy_threshold or no_improve >= no_improve_count:
+
+        if (val_acc >= accuracy_threshold and no_improve >= no_improve_count):
             break
 
     plt.figure()
