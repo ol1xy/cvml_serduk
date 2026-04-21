@@ -1,0 +1,8 @@
+path: ./SPHERES_AND_CUBES_NEW/
+train: images/train
+val: images/val
+
+names:
+  0: cube 
+  1: neither
+  2: sphere
