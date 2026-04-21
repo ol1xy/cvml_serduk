@@ -1,4 +1,4 @@
-path: ./SPHERES_AND_CUBES_NEW/
+path: ./spheres_and_cubes_new/
 train: images/train
 val: images/val
 

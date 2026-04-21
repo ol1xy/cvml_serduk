@@ -18,6 +18,8 @@ figure-dataset/
 ###Models###
 *.pth
 *.pt
+yolo/runs/
+*.cache
 
 ### Images ###
 *.png
