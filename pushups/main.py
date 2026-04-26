@@ -43,7 +43,7 @@ def count_pushups(annotated_obj, keypoints, angles):
     right_wrist = keypoints[10]
 
     if (left_shoulder[1] > 0 and
-            left_elbow[1] > 0 and left_wrist[0] > 0) or (right_shoulder[1] > 0 and
+            left_elbow[1] > 0 and left_wrist[0] > 0) and (right_shoulder[1] > 0 and
             right_elbow[1] > 0 and right_wrist[0] > 0):
 
             angle = get_angle(left_shoulder,
