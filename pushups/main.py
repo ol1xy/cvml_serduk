@@ -20,6 +20,7 @@ counter = 0
 def count_pushups(annotated_obj, keypoints):
     global counter
     global stage
+    angles = []
 
     nose_seen = (keypoints[0][0] > 0 and keypoints[0][1] > 0)
     eyes_seen = (keypoints[1][0] > 0 and keypoints[1][1] > 0 and keypoints[2][0] > 0 and keypoints[2][1] > 0)
@@ -30,23 +31,30 @@ def count_pushups(annotated_obj, keypoints):
     left_wrist = keypoints[9]
     right_wrist = keypoints[10]
 
-    if (left_shoulder[1] and
-            left_elbow[1]):
-            #  or (right_shoulder[1] < 
-            #                    right_elbow[1] <
-            #                    right_wrist[1]):
+    if (left_shoulder[1] > 0 and
+            left_elbow[1] > 0) or (right_shoulder[1] > 0 and
+            right_elbow[1] > 0):
+
             angle = get_angle(left_shoulder,
                                    left_elbow,
                                    left_wrist)
-            if angle >= threshhold_up:
+            angles.append(angle)
+            if len(angles > 5):
+                angles.pop(0)
+            smooth_angle = np.mean(angles)
+            
+            if smooth_angle >= threshhold_up and stage == 'DOWN':
                 stage = 'UP'
-            if stage == 'UP' and angle <= threshhold_down:
-                stage = 'DOWN'
                 counter += 1
+
+            if smooth_angle <= threshhold_down:
+                stage = 'DOWN'
+
+                
     
     else:
         counter = 0
-    cv2.putText(annotated_obj, f'{counter} pushups', (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 1)
+    cv2.putText(annotated_obj, f'{counter} pushups', (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 1)
 
     return None
 
@@ -55,6 +63,7 @@ camera = cv2.VideoCapture(0)
 
 ps = None
 
+frame_count = 0
 while camera.isOpened():
     ret, frame = camera.read()
     cv2.imshow("Camera", frame)
@@ -63,14 +72,19 @@ while camera.isOpened():
         break
 
     t = time.perf_counter()
-    results = model(frame)
-    if not results:
-        continue
+
+    if frame_count % 2 == 0:
+        results = model(frame)
+        if not results:
+            continue
 
     result = results[0]
     keypoints = result.keypoints.xy.tolist()
+    
     if not keypoints:
         continue
+
+    frame_count += 1
 
     annotator = Annotator(frame)
     annotator.kpts(result.keypoints.data[0], result.orig_shape, 5, True)
