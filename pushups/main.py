@@ -12,7 +12,15 @@ def get_angle(a, b, c):
     angle = angle + 360 if angle < 0 else angle
     return 360 - angle if angle > 180 else angle
 
-def detect_hands_up(annotated_obj, keypoints):
+stage = None
+threshhold_up = 160
+threshhold_down = 115
+counter = 0
+
+def count_pushups(annotated_obj, keypoints):
+    global counter
+    global stage
+
     nose_seen = (keypoints[0][0] > 0 and keypoints[0][1] > 0)
     eyes_seen = (keypoints[1][0] > 0 and keypoints[1][1] > 0 and keypoints[2][0] > 0 and keypoints[2][1] > 0)
     left_shoulder = keypoints[5]
@@ -23,20 +31,25 @@ def detect_hands_up(annotated_obj, keypoints):
     right_wrist = keypoints[10]
 
     if nose_seen and eyes_seen:
-        # print(get_angle(left_shoulder,
-        #                 left_elbow,
-        #                 left_wrist))
         if (left_shoulder[1] > 
             left_elbow[1] > 
             left_wrist[1]) or (right_shoulder[1] > 
                                right_elbow[1] > 
                                right_wrist[1]):
             
-            left_angle = get_angle(left_shoulder,
+            angle = get_angle(left_shoulder,
                                    left_elbow,
                                    left_wrist)
-            cv2.putText(annotated_obj, f"Hands Up({left_angle:.1f})", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 1)
-            return True
+            if angle >= threshhold_up:
+                stage = 'UP'
+            if stage == 'UP' and angle <= threshhold_down:
+                stage = 'DOWN'
+                counter += 1
+    
+    else:
+        counter = 0
+    cv2.putText(annotated_obj, f'{counter} pushups', (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 1)
+
     return None
 
 model = YOLO("yolo26n-pose.pt")
@@ -65,6 +78,6 @@ while camera.isOpened():
     annotator.kpts(result.keypoints.data[0], result.orig_shape, 5, True)
     annotated = annotator.result()
     
-    detect_hands_up(annotated, keypoints[0])
+    count_pushups(annotated, keypoints[0])
 
     cv2.imshow("Pose", annotated)
