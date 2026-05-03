@@ -119,44 +119,50 @@ class Decoder(nn.Module):
         return x
 
 if __name__ == "__main__":
-    encoder = Encoder()
-    decoder = Decoder()
-
-    # total_params = sum(p.numel() for p in encoder.parameters())
-    # print(total_params)
-
+   
     device = torch_directml.device()
-
-    dataset = ImageDataset(2000, 256)
-    dataloader = DataLoader(dataset, batch_size=16,
-                            shuffle = True)
-
-    encoder.to(device)
-    decoder.to(device)
-
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(list(encoder.parameters()) + 
-                                list(decoder.parameters()))
-
-    encoder.train()
-    decoder.train()
-
     epochs = 10
-    for epoch in range(epochs):
-        epoch_loss = 0.0
-        for imgs, _ in dataloader:
-            imgs = imgs.to(device)
-            optimizer.zero_grad()
-            latent = encoder(imgs)
-            output = decoder(latent)
-            loss = criterion(imgs, output)
-            loss.backward()
-            optimizer.step()
-            epoch_loss += loss.item()
-        avg_loss = epoch_loss / len(dataloader)
-        print(f"{epoch=}, {avg_loss=:.2f}")
+    losses = {}
 
-    torch.save(encoder.state_dict(), "encoder.pth")
-    torch.save(decoder.state_dict(), "decoder.pth")
+    for cur_mode in range(1, 5):
+        print(f"training model in {cur_mode} mode")
+        encoder = Encoder()
+        decoder = Decoder()
+
+
+        dataset = ImageDataset(2000, 256, mode=cur_mode)
+        dataloader = DataLoader(dataset, batch_size=16,
+                                shuffle = True)
+
+        encoder.to(device)
+        decoder.to(device)
+
+        criterion = nn.MSELoss()
+        optimizer = torch.optim.Adam(list(encoder.parameters()) + 
+                                    list(decoder.parameters()))
+
+        encoder.train()
+        decoder.train()
+
+        
+        for epoch in range(epochs):
+            epoch_loss = 0.0
+            for imgs, _ in dataloader:
+                imgs = imgs.to(device)
+                optimizer.zero_grad()
+                latent = encoder(imgs)
+                output = decoder(latent)
+                loss = criterion(imgs, output)
+                loss.backward()
+                optimizer.step()
+                epoch_loss += loss.item()
+            avg_loss = epoch_loss / len(dataloader)
+            print(f"{cur_mode=}, {epoch=}, {avg_loss=:.2f}")
+        losses[cur_mode] = avg_loss
+
+        torch.save(encoder.state_dict(), f"encoder_mode_{cur_mode}.pth")
+        torch.save(decoder.state_dict(), f"decoder_mode_{cur_mode}.pth")
+
+    print(losses)
 
 
