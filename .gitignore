@@ -36,6 +36,7 @@ images
 
 ### Stuff
 *.pdf
+*.pptx
 
 ### OpenCV ###
 #OpenCV for Mac and Linux
