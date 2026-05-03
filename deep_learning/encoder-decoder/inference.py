@@ -19,7 +19,7 @@ with torch.no_grad():
     plt.subplot(131)
     plt.imshow(image.squeeze())
     plt.subplot(132)
-    plt.imshow(image.squeeze().detach().numpy())
+    plt.imshow(result.squeeze().detach().numpy())
     plt.subplot(133)
     plt.imshow(image.squeeze() - result.squeeze())
     plt.show()
