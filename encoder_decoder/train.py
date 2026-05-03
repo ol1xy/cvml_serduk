@@ -9,10 +9,11 @@ import torch_directml
 
 class ImageDataset(Dataset):
 
-    def __init__(self, n=200, size=128):
+    def __init__(self, n=200, size=128, mode=1):
         super().__init__()
         self.n = n
         self.size = size
+        self.mode = mode
         self.transform = transforms.Compose([
             transforms.ToTensor()
         ])
@@ -27,10 +28,26 @@ class ImageDataset(Dataset):
         font = ImageFont.load_default()
 
         text = "ABD"
-        # x = np.random.randint(10, self.size - 40)
-        # y = np.random.randint(10, self.size - 40)
         x = 30
         y = 30
+
+        if self.mode == 1:
+            x = np.random.randint(10, self.size - 40)
+            y = np.random.randint(10, self.size - 20)
+
+        elif self.mode == 2:
+            text = ''.join(np.random.choices(np.string.ascii_uppercase, k = 3))
+
+        elif self.mode == 3:
+            length = np.randint(1, 9)
+            text = ''.join(np.random.choices(np.string.ascii_uppercase, k = length))
+
+        elif self.mode == 4:
+            length = np.randint(1, 9)
+            x = np.random.randint(10, self.size - (10 * length) - 10)
+            y = np.random.randint(10, self.size - 20)
+            text = ''.join(np.random.choices(np.string.ascii_uppercase, k = length))  
+
         draw.text((x, y), text, fill = 0, font = font)
 
         tensor = self.transform(image)
