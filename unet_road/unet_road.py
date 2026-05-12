@@ -25,9 +25,9 @@ class RoadsDataset(Dataset):
         return self.len
     
     def __getitem__(self, index):
-        image = Image.open(self.images[index]).convert("RGB")
+        image = Image.open(self.images[index]).convert("RGB").resize((256, 256))
         image = np.array(image, np.float32) / 255.
-        mask = Image.open(self.masks[index]).convert("L")
+        mask = Image.open(self.masks[index]).convert("L").resize((256, 256))
         mask = np.array(mask, dtype=np.float32) 
         mask = (mask == 82).astype(np.float32)
         mask = np.expand_dims(mask, axis=0) # 1, H, W
@@ -116,9 +116,6 @@ class DiceLoss(nn.Module):
         intersection = (p_area * t_area).sum()
 
         return 1 - (2 * intersection + 1) / (p_area.sum() + t_area.sum() + 1)
-    
-    #TODO подобрать количество эпох
-    #TODO каждые 10 эпох выводить картинки, чтобы не теряться
 
 
 ds = RoadsDataset(path)
@@ -129,9 +126,9 @@ model.to(device)
 
 optimizer = optim.Adam(model.parameters(), lr = 1e-4)
 criterion = DiceLoss()
-dataloader = DataLoader(ds, batch_size=8, shuffle=True)
+dataloader = DataLoader(ds, batch_size=2, shuffle=True)
 
-for epoch in range(50):
+for epoch in range(30):
     for batch_idx, (data, targets) in enumerate(dataloader):
         data, targets = data.to(device), targets.to(device)
         pred = model(data)
@@ -141,15 +138,22 @@ for epoch in range(50):
         loss.backward()
         optimizer.step()
 
-        if (epoch % 10) == 0:
-            sample_image, _ = ds[0]
-            with torch.no_grad():
-                
+    if (epoch % 10) == 0:
+        model.eval()
+        fig, axes = plt.subplots(1, 4, figsize=(16, 4))
+        with torch.no_grad():
+            for i in range(4):
+                idx = np.random.randint(0, len(ds))
+                sample_image, _ = ds[idx]
                 res = model(sample_image.unsqueeze(0).to(device))
-                plt.imshow(res.squeeze().cpu().numpy())
-                plt.show()
+                pred = torch.sigmoid(res).squeeze().cpu().numpy()
+                axes[i].imshow(pred, cmap='gray')
+                axes[i].axis('off')
+
+        plt.tight_layout()
+        plt.show()
+        plt.close()
+        model.train()     
+
     print(f"{epoch=}, loss: {loss.item()}")
-# trainable = sum(p.numel()
-#                         for p in model.parameters()
-#                         if p.requires_grad)
-# print(trainable)
+torch.save(model.state_dict(), 'unet_roads.pth')
