@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torchvision.transforms as transforms
 from PIL import Image
+import torch_directml
 
 path = Path("./roads/roads")
 
@@ -25,15 +26,15 @@ class RoadsDataset(Dataset):
     
     def __getitem__(self, index):
         image = Image.open(self.images[index]).convert("RGB")
-        image = np.array(image) / 255.
+        image = np.array(image, np.float32) / 255.
         mask = Image.open(self.masks[index]).convert("L")
-        mask = np.array(mask, dtype="f4")
-        mask = (mask == 82).astype("f4")
+        mask = np.array(mask, dtype=np.float32) 
+        mask = (mask == 82).astype(np.float32)
         mask = np.expand_dims(mask, axis=0) # 1, H, W
         
         if np.random.rand() > 0.5:
-            image = np.flip(image, axis = 1)
-            mask  = np.flip(mask, axis=2)
+            image = np.flip(image, axis = 1).copy()
+            mask  = np.flip(mask, axis=2).copy()
         image = torch.from_numpy(image.transpose(2, 0, 1)) #C H W
         mask = torch.from_numpy(mask)
 
@@ -90,11 +91,14 @@ class UNet(nn.Module):
 
         skips = skips[::-1]
 
-        for idx, in range(0, len(self.upscale), 2):
+        for idx in range(0, len(self.upscale), 2):
             x = self.upscale[idx](x)
             skip = skips[idx // 2]
 
-            cx = torch.xat((skip, x), dim=1)
+            if x.shape != skip.shape:
+                x = transforms.functional.resize(x, size = skip.shape[2:])
+
+            cx = torch.cat((skip, x), dim=1)
             x = self.upscale[idx+1](cx)
         return self.result(x)
         
@@ -119,15 +123,33 @@ class DiceLoss(nn.Module):
 
 ds = RoadsDataset(path)
 model = UNet()
-trainable = sum(p.numel()
-                        for p in model.parameters()
-                        if p.requires_grad)
-print(trainable)
 
-# image, mask = ds[0]
+device = torch_directml.device()
+model.to(device)
 
-# plt.subplot(121)
-# plt.imshow(image)
-# plt.subplot(122)
-# plt.imshow(mask[0])
-# plt.show()
+optimizer = optim.Adam(model.parameters(), lr = 1e-4)
+criterion = DiceLoss()
+dataloader = DataLoader(ds, batch_size=8, shuffle=True)
+
+for epoch in range(50):
+    for batch_idx, (data, targets) in enumerate(dataloader):
+        data, targets = data.to(device), targets.to(device)
+        pred = model(data)
+        loss = criterion(pred, targets)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if (epoch % 10) == 0:
+            sample_image, _ = ds[0]
+            with torch.no_grad():
+                
+                res = model(sample_image.unsqueeze(0).to(device))
+                plt.imshow(res.squeeze().cpu().numpy())
+                plt.show()
+    print(f"{epoch=}, loss: {loss.item()}")
+# trainable = sum(p.numel()
+#                         for p in model.parameters()
+#                         if p.requires_grad)
+# print(trainable)
