@@ -128,32 +128,34 @@ optimizer = optim.Adam(model.parameters(), lr = 1e-4)
 criterion = DiceLoss()
 dataloader = DataLoader(ds, batch_size=2, shuffle=True)
 
-for epoch in range(30):
-    for batch_idx, (data, targets) in enumerate(dataloader):
-        data, targets = data.to(device), targets.to(device)
-        pred = model(data)
-        loss = criterion(pred, targets)
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+if __name__ == "__main__":
+    for epoch in range(30):
+        for batch_idx, (data, targets) in enumerate(dataloader):
+            data, targets = data.to(device), targets.to(device)
+            pred = model(data)
+            loss = criterion(pred, targets)
 
-    if (epoch % 10) == 0:
-        model.eval()
-        fig, axes = plt.subplots(1, 4, figsize=(16, 4))
-        with torch.no_grad():
-            for i in range(4):
-                idx = np.random.randint(0, len(ds))
-                sample_image, _ = ds[idx]
-                res = model(sample_image.unsqueeze(0).to(device))
-                pred = torch.sigmoid(res).squeeze().cpu().numpy()
-                axes[i].imshow(pred, cmap='gray')
-                axes[i].axis('off')
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-        plt.tight_layout()
-        plt.show()
-        plt.close()
-        model.train()     
+        if (epoch % 10) == 0:
+            model.eval()
+            fig, axes = plt.subplots(1, 4, figsize=(16, 4))
+            with torch.no_grad():
+                for i in range(4):
+                    idx = np.random.randint(0, len(ds))
+                    sample_image, _ = ds[idx]
+                    res = model(sample_image.unsqueeze(0).to(device))
+                    pred = torch.sigmoid(res).squeeze().cpu().numpy()
+                    axes[i].imshow(pred, cmap='gray')
+                    axes[i].axis('off')
 
-    print(f"{epoch=}, loss: {loss.item()}")
-torch.save(model.state_dict(), 'unet_roads.pth')
+            plt.tight_layout()
+            plt.show()
+            plt.close()
+            model.train()     
+
+        print(f"{epoch=}, loss: {loss.item()}")
+    torch.save(model.state_dict(), 'unet_roads.pth')
